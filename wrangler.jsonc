@@ -1,0 +1,32 @@
+/**
+ * Configurazione del Worker: https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "flashcard-vocaboli",
+	"main": "./dist/_worker.js",
+	"compatibility_date": "2025-12-28",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"assets": {
+		"binding": "ASSETS",
+		"directory": "./dist",
+	},
+	"observability": {
+		"enabled": true,
+	},
+	/**
+   * Database D1 (SQLite). Dopo `npx wrangler d1 create vocaboli`
+   * incolla qui il database_id che ti restituisce.
+   */
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "vocaboli",
+			"database_id": "fac5d3d7-451f-4c4a-b9c8-9610d91d45b1",
+			"migrations_dir": "migrations",
+		},
+	],
+}
