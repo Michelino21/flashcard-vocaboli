@@ -47,3 +47,6 @@ functions/**/*.js
 
 # Wrangler (DB D1 locale)
 .wrangler
+
+# Segreti locali del Worker
+.dev.vars*

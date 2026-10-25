@@ -7,7 +7,9 @@ import {
   zod$,
   type DocumentHead,
 } from "@builder.io/qwik-city";
+import { requireUser } from "~/lib/auth";
 import { getDB, type Word } from "~/lib/db";
+import { useUser } from "~/routes/layout";
 import { percent } from "~/lib/scheduler";
 
 export const useAllWords = routeLoader$(async (ev) => {
@@ -22,6 +24,7 @@ const id = z.coerce.number().int().positive();
 
 export const useUpdateWord = routeAction$(
   async ({ id, en, it }, ev) => {
+    await requireUser(ev);
     await getDB(ev).prepare("UPDATE words SET en = ?, it = ? WHERE id = ?").bind(en, it, id).run();
   },
   zod$({ id, en: z.string().trim().min(1), it: z.string().trim().min(1) }),
@@ -29,6 +32,7 @@ export const useUpdateWord = routeAction$(
 
 export const useSetVisible = routeAction$(
   async ({ id, visible }, ev) => {
+    await requireUser(ev);
     await getDB(ev).prepare("UPDATE words SET visible = ? WHERE id = ?").bind(visible, id).run();
   },
   zod$({ id, visible: z.coerce.number().int().min(0).max(1) }),
@@ -36,6 +40,7 @@ export const useSetVisible = routeAction$(
 
 export const useDeleteWord = routeAction$(
   async ({ id }, ev) => {
+    await requireUser(ev);
     await getDB(ev).prepare("DELETE FROM words WHERE id = ?").bind(id).run();
   },
   zod$({ id }),
@@ -43,6 +48,7 @@ export const useDeleteWord = routeAction$(
 
 export default component$(() => {
   const words = useAllWords();
+  const user = useUser();
   const query = useSignal("");
 
   // Come useMemo: si ricalcola solo quando cambiano words o query
@@ -91,7 +97,7 @@ export default component$(() => {
       ) : (
         <ul class="word-list">
           {filtered.value.map((w) => (
-            <WordRow key={w.id} word={w} />
+            <WordRow key={w.id} word={w} canEdit={!!user.value} />
           ))}
         </ul>
       )}
@@ -100,13 +106,13 @@ export default component$(() => {
 });
 
 /** Una riga: modalità lettura, modifica o conferma eliminazione */
-const WordRow = component$<{ word: Word }>(({ word }) => {
+const WordRow = component$<{ word: Word; canEdit: boolean }>(({ word, canEdit }) => {
   const mode = useSignal<"view" | "edit" | "delete">("view");
   const update = useUpdateWord();
   const setVisible = useSetVisible();
   const del = useDeleteWord();
 
-  if (mode.value === "edit") {
+  if (canEdit && mode.value === "edit") {
     return (
       <li class="word-row editing">
         <Form action={update} class="edit-form" onSubmitCompleted$={() => (mode.value = "view")}>
@@ -144,7 +150,7 @@ const WordRow = component$<{ word: Word }>(({ word }) => {
         <span class="rate">{percent(word)}</span>
       </div>
 
-      {mode.value === "delete" ? (
+      {!canEdit ? null : mode.value === "delete" ? (
         <div class="row-actions confirm">
           <span>Eliminare “{word.en}”?</span>
           <button class="btn btn-ghost" onClick$={() => (mode.value = "view")}>

@@ -3,17 +3,26 @@ import {
   Form,
   Link,
   routeAction$,
+  routeLoader$,
   useLocation,
   z,
   zod$,
   type RequestHandler,
 } from "@builder.io/qwik-city";
+import { clearSession, getUser, requireUser } from "~/lib/auth";
 import { getDB } from "~/lib/db";
 
 /** I dati cambiano a ogni risposta: niente cache sulle pagine */
 export const onRequest: RequestHandler = ({ headers }) => {
   headers.set("Cache-Control", "no-store");
 };
+
+/** Utente loggato (o null): lo leggono layout e pagine per mostrare/nascondere i comandi di modifica */
+export const useUser = routeLoader$((ev) => getUser(ev));
+
+export const useLogout = routeAction$((_, ev) => {
+  clearSession(ev);
+});
 
 /**
  * Action per aggiungere una parola. Sta nel layout così il form
@@ -23,6 +32,7 @@ export const onRequest: RequestHandler = ({ headers }) => {
  */
 export const useAddWord = routeAction$(
   async ({ en, it }, ev) => {
+    await requireUser(ev);
     await getDB(ev)
       .prepare("INSERT INTO words (en, it) VALUES (?, ?)")
       .bind(en, it)
@@ -39,6 +49,8 @@ export default component$(() => {
   const loc = useLocation();
   const addOpen = useSignal(false);
   const add = useAddWord();
+  const user = useUser();
+  const logout = useLogout();
   const enInput = useSignal<HTMLInputElement>();
 
   return (
@@ -58,20 +70,35 @@ export default component$(() => {
             Parole
           </Link>
         </nav>
-        <button
-          class="btn btn-primary"
-          aria-expanded={addOpen.value}
-          onClick$={() => {
-            addOpen.value = !addOpen.value;
-            // aspetta il render e poi metti il cursore sul primo campo
-            if (addOpen.value) setTimeout(() => enInput.value?.focus(), 0);
-          }}
-        >
-          {addOpen.value ? "Chiudi" : "+ Aggiungi"}
-        </button>
+        {user.value ? (
+          <>
+            <button
+              class="btn btn-primary"
+              aria-expanded={addOpen.value}
+              onClick$={() => {
+                addOpen.value = !addOpen.value;
+                // aspetta il render e poi metti il cursore sul primo campo
+                if (addOpen.value) setTimeout(() => enInput.value?.focus(), 0);
+              }}
+            >
+              {addOpen.value ? "Chiudi" : "+ Aggiungi"}
+            </button>
+            <Form action={logout}>
+              <button class="btn btn-ghost" type="submit" title={`Collegato come ${user.value.username}`}>
+                Esci
+              </button>
+            </Form>
+          </>
+        ) : (
+          !loc.url.pathname.startsWith("/login") && (
+            <Link href="/login/" class="btn btn-primary">
+              Accedi
+            </Link>
+          )
+        )}
       </header>
 
-      {addOpen.value && (
+      {user.value && addOpen.value && (
         <Form
           action={add}
           class="add-panel"

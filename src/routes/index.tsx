@@ -1,7 +1,9 @@
 import { $, component$, useSignal, useStore, useTask$ } from "@builder.io/qwik";
-import { routeLoader$, server$, type DocumentHead } from "@builder.io/qwik-city";
+import { Link, routeLoader$, server$, type DocumentHead } from "@builder.io/qwik-city";
+import { requireUser } from "~/lib/auth";
 import { getDB, type Word } from "~/lib/db";
 import { percent, pickWeighted } from "~/lib/scheduler";
+import { useUser } from "~/routes/layout";
 
 type Mode = "en" | "it" | "mix";
 type Dir = "en" | "it";
@@ -20,6 +22,7 @@ export const useWords = routeLoader$(async (ev) => {
  * salvare la risposta, lo stato della pagina lo aggiorniamo noi.
  */
 const recordAnswer = server$(async function (id: number, ok: boolean) {
+  await requireUser(this);
   await getDB(this)
     .prepare("UPDATE words SET shown = shown + 1, correct = correct + ? WHERE id = ?")
     .bind(ok ? 1 : 0, id)
@@ -36,6 +39,7 @@ function chooseDir(m: Mode): Dir {
 
 export default component$(() => {
   const words = useWords();
+  const user = useUser();
   const mode = useSignal<Mode>("en");
   const state = useStore({
     list: [] as Word[],
@@ -82,7 +86,7 @@ export default component$(() => {
       await recordAnswer(w.id, ok);
       state.error = "";
     } catch {
-      state.error = "Risposta non salvata: controlla la connessione.";
+      state.error = "Risposta non salvata: controlla la connessione o accedi di nuovo.";
     }
   });
 
@@ -151,7 +155,16 @@ export default component$(() => {
         </button>
       </div>
 
-      {state.flipped ? (
+      {state.flipped && !user.value ? (
+        <div class="answer">
+          <button class="btn btn-primary wide" onClick$={next}>
+            Prossima carta
+          </button>
+          <p class="muted wide">
+            <Link href="/login/">Accedi</Link> per segnare le risposte.
+          </p>
+        </div>
+      ) : state.flipped ? (
         <div class="answer">
           <button class="btn btn-miss" onClick$={() => answer(false)}>
             Non la sapevo

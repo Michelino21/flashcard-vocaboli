@@ -14,11 +14,14 @@ Le parole sbagliate escono più spesso. Il peso di estrazione è `0.2 + 4·(1 �
 ## Struttura
 
 ```
-migrations/0001_crea_tabella_words.sql  schema della tabella words
+migrations/                             schema: words (0001), users (0002)
+scripts/new-user.mjs                    crea un utente (vedi Login)
 seed.sql                                8 parole di esempio (facoltative)
 wrangler.jsonc                          config del Worker + binding D1 "DB"
 src/lib/db.ts                           tipo Word e getDB()
 src/lib/scheduler.ts                    estrazione pesata delle carte
+src/lib/auth.ts                         password, cookie di sessione, requireUser()
+src/routes/login/index.tsx              pagina di accesso
 src/routes/layout.tsx                   barra in alto + action "Aggiungi"
 src/routes/index.tsx                    pagina Studia (loader + server$)
 src/routes/parole/index.tsx             elenco con modifica/elimina/visibilità
@@ -49,9 +52,25 @@ npm run deploy                    # build + wrangler deploy
 
 Il sito risponde su `https://flashcard-vocaboli.<tuo-account>.workers.dev`. Se cambi i binding in `wrangler.jsonc`, rigenera i tipi con `npm run cf-typegen`.
 
+## Login
+
+Chiunque può vedere le carte e l'elenco delle parole. Solo chi ha fatto il login può segnare le risposte, aggiungere, modificare, nascondere ed eliminare parole.
+
+- Gli utenti stanno nella tabella `users` (`id`, `username`, `password`). Non c'è registrazione: si creano da terminale, e la password si digita senza che compaia a schermo.
+  ```bash
+  npm run user:add:local -- nome   # D1 locale
+  npm run user:add -- nome         # D1 remoto
+  ```
+  Rilanciarlo con lo stesso nome cambia la password. Per eliminare un utente: `npx wrangler d1 execute vocaboli --remote --command "DELETE FROM users WHERE username='nome'"`.
+- La sessione è un cookie firmato (30 giorni), senza tabella delle sessioni. La chiave è il secret `SESSION_SECRET`:
+  - in locale sta in `.dev.vars` (non committato): `SESSION_SECRET=<una stringa casuale lunga>`;
+  - in produzione: `openssl rand -base64 32 | npx wrangler secret put SESSION_SECRET`.
+  Cambiare il secret fa uscire tutti. Eliminare un utente dal DB chiude subito le sue sessioni.
+- Le password sono salvate con PBKDF2-SHA256, 50000 iterazioni (il Worker ne accetta al massimo 100000 e sul piano gratuito ha circa 10 ms di CPU per richiesta).
+- Non c'è un limite ai tentativi di accesso.
+
 ## Da sapere
 
-- **Non c'è login**: chiunque abbia l'URL può modificare le parole. Per tenerlo privato, proteggilo con Cloudflare Access (Zero Trust → Access → Applications), che è gratis fino a 50 utenti.
 - Il file `src/entry.cloudflare-pages.tsx` si chiama così anche se usiamo i Workers, perché l'adapter di Qwik è lo stesso. Non va rinominato.
 - Per modificare lo schema crea `migrations/0002_….sql` e rilancia `db:migrate:local` / `db:migrate`. Non modificare la 0001 già applicata.
 

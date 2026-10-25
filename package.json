@@ -27,6 +27,8 @@
     "db:migrate:local": "wrangler d1 migrations apply vocaboli --local",
     "db:migrate": "wrangler d1 migrations apply vocaboli --remote",
     "db:seed:local": "wrangler d1 execute vocaboli --local --file=seed.sql",
+    "user:add:local": "node scripts/new-user.mjs --local",
+    "user:add": "node scripts/new-user.mjs --remote",
     "db:seed": "wrangler d1 execute vocaboli --remote --file=seed.sql"
   },
   "devDependencies": {

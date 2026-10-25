@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-English ↔ Italian flashcard app (UI and docs are in Italian). Qwik City app deployed as a Cloudflare Worker, with a D1 (SQLite) database bound as `DB`. There is no auth and no test suite. `README.md` has the user-facing description and `qwikguide.md` is a React→Qwik primer (read it before touching `$()` closures).
+English ↔ Italian flashcard app (UI and docs are in Italian). Qwik City app deployed as a Cloudflare Worker, with a D1 (SQLite) database bound as `DB`. Login is a hand-rolled minimum (see Auth); there is no test suite. `README.md` has the user-facing description and `qwikguide.md` is a React→Qwik primer (read it before touching `$()` closures).
 
 ## Commands
 
@@ -31,6 +31,13 @@ Remote DB: `npm run db:migrate` / `db:seed`. `wrangler.jsonc` still has the plac
 - **Scheduling**: `src/lib/scheduler.ts` does weighted random card selection (`0.2 + 4·(1 − p)²`, `p = (correct+1)/(shown+2)`), so missed words appear more often.
 - **Routes**: `src/routes/layout.tsx` (top bar + global "Aggiungi" action), `src/routes/index.tsx` (study), `src/routes/parole/index.tsx` (list/edit/delete/toggle visibility).
 - **Schema**: `words(id, en, it, shown, correct, visible 0/1)`. Change it only by adding a new `migrations/000N_*.sql`; never edit an applied migration.
+
+## Auth
+
+- Reads are public; every write must call `requireUser(ev)` from `src/lib/auth.ts` first (all `routeAction$` handlers and `recordAnswer`). New write paths need the same guard, since hiding buttons in the UI is not enough.
+- `users(id, username, password)`; password is `pbkdf2$iterations$salt$hash`. Users are created only with `npm run user:add[:local] -- name` (`scripts/new-user.mjs`, which duplicates the hash format of `auth.ts`).
+- Session is a stateless HMAC-signed cookie `id.expiry.sig` keyed by the `SESSION_SECRET` Worker secret (`.dev.vars` locally, `wrangler secret put` remotely). `useUser` loader in `src/routes/layout.tsx` exposes the user to pages.
+- Workers cap PBKDF2 at 100000 iterations and the free plan gives ~10 ms CPU, hence 50000.
 
 ## Gotchas
 

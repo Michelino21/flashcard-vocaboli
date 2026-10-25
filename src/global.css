@@ -194,3 +194,10 @@ input:not([type="hidden"]) {
 .topbar { gap: 8px; }
 .topbar .btn { padding: 8px 12px; font-size: .8rem; }
 .tabs a { padding: 8px 10px; }
+
+/* ---- login ---- */
+a.btn { text-decoration: none; display: inline-block; }
+.topbar form { display: contents; }
+.answer .wide { grid-column: 1 / -1; }
+.login { max-width: 360px; display: flex; flex-direction: column; gap: 14px; }
+.login form { display: flex; flex-direction: column; gap: 12px; background: var(--card); padding: 16px; border-radius: 8px; border: 1px solid var(--line); }
