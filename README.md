@@ -54,19 +54,44 @@ Il sito risponde su `https://flashcard-vocaboli.<tuo-account>.workers.dev`. Se c
 
 ## Login
 
-Chiunque può vedere le carte e l'elenco delle parole. Solo chi ha fatto il login può segnare le risposte, aggiungere, modificare, nascondere ed eliminare parole.
+Chiunque può vedere le carte e l'elenco delle parole. Solo chi ha fatto il login può segnare le risposte, aggiungere, modificare, nascondere ed eliminare parole. Non c'è registrazione: gli utenti si creano da terminale.
 
-- Gli utenti stanno nella tabella `users` (`id`, `username`, `password`). Non c'è registrazione: si creano da terminale, e la password si digita senza che compaia a schermo.
+### Prima configurazione
+
+1. **Tabella `users`**: `npm run db:migrate:local` (locale) e `npm run db:migrate` (remoto). Applica la migrazione `0002`.
+2. **Chiave per i cookie di sessione** (`SESSION_SECRET`, almeno 16 caratteri, casuale):
+   - in locale, in un file `.dev.vars` nella radice (già nel `.gitignore`):
+     ```bash
+     printf 'SESSION_SECRET=%s\n' "$(LC_ALL=C tr -dc 'A-Z0-9' </dev/urandom | head -c 48)" > .dev.vars
+     ```
+   - in produzione, una volta sola (resta anche dopo i deploy, anche da GitHub):
+     ```bash
+     LC_ALL=C tr -dc 'A-Z0-9' </dev/urandom | head -c 48 | npx wrangler secret put SESSION_SECRET
+     ```
+3. **Crea il primo utente** (vedi sotto), poi fai il deploy.
+
+### Creare un utente
+
+```bash
+npm run user:add:local -- nome   # D1 locale
+npm run user:add -- nome         # D1 remoto
+```
+
+Lo script chiede la password due volte, senza mostrarla (minimo 8 caratteri: meglio una frase lunga di 4 o più parole a caso). Il nome può avere lettere, numeri, `.`, `_`, `-` (max 32). La password viene salvata come hash, mai in chiaro.
+
+- **Cambiare la password**: rilancia lo stesso comando con lo stesso nome.
+- **Eliminare un utente** (chiude subito le sue sessioni):
   ```bash
-  npm run user:add:local -- nome   # D1 locale
-  npm run user:add -- nome         # D1 remoto
+  npx wrangler d1 execute vocaboli --remote --command "DELETE FROM users WHERE username='nome'"
   ```
-  Rilanciarlo con lo stesso nome cambia la password. Per eliminare un utente: `npx wrangler d1 execute vocaboli --remote --command "DELETE FROM users WHERE username='nome'"`.
-- La sessione è un cookie firmato (30 giorni), senza tabella delle sessioni. La chiave è il secret `SESSION_SECRET`:
-  - in locale sta in `.dev.vars` (non committato): `SESSION_SECRET=<una stringa casuale lunga>`;
-  - in produzione: `openssl rand -base64 32 | npx wrangler secret put SESSION_SECRET`.
-  Cambiare il secret fa uscire tutti. Eliminare un utente dal DB chiude subito le sue sessioni.
-- Le password sono salvate con PBKDF2-SHA256, 50000 iterazioni (il Worker ne accetta al massimo 100000 e sul piano gratuito ha circa 10 ms di CPU per richiesta).
+- **Vedere gli utenti**: `npx wrangler d1 execute vocaboli --remote --command "SELECT id, username FROM users"`.
+
+Usa `--local` al posto di `--remote` per il database locale.
+
+### Come funziona
+
+- La sessione è un cookie firmato (HttpOnly, 30 giorni), senza tabella delle sessioni. Cambiare `SESSION_SECRET` fa uscire tutti.
+- Le password sono salvate con PBKDF2-SHA256, 50000 iterazioni (il Worker ne accetta al massimo 100000 e sul piano gratuito ha circa 10 ms di CPU per richiesta). Se il login dà errore di CPU, abbassa `ITERATIONS` in `scripts/new-user.mjs` e ricrea l'utente.
 - Non c'è un limite ai tentativi di accesso.
 
 ## Da sapere
